@@ -1,0 +1,37 @@
+{
+    "version": 7,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 25,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "macos",
+            "hidden": false,
+            "description": "Configure for macOS with Clang",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build.macos",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_EXPORT_COMPILE_COMMANDS":"ON"
+            }
+        },
+        {
+            "name": "ios",
+            "hidden": false,
+            "description": "Configure for iOS with Clang",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build.ios",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/ios.toolchain.cmake",
+                "PLATFORM": "OS64",
+                "DEPLOYMENT_TARGET": "14.0",
+                "CMAKE_MACOSX_BUNDLE":"OFF",
+                "CMAKE_EXPORT_COMPILE_COMMANDS":"ON"
+            }
+        }
+        
+    ]
+}
