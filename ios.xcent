@@ -1,0 +1,33 @@
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.springboard.debugapplications</key>
+	<true/>
+	<key>get-task-allow</key>
+	<true/>
+	<key>task_for_pid-allow</key>
+	<true/>
+	<key>run-unsigned-code</key>
+	<true/>
+	<key>com.apple.private.cs.debugger</key>
+	<true/>
+	<key>platform-application</key>
+    <true/>
+    <key>com.apple.private.security.container-required</key>
+    <false/>
+	<key>com.apple.private.host-exception-port-override</key>
+	<true/>
+	<key>com.apple.private.kernel.get-kext-info</key>
+	<true/>
+	<key>com.apple.private.pluginkit.manager</key>
+	<true/>
+	<key>com.apple.private.xpc.role-account</key>
+	<true/>
+	<key>com.apple.private.xpc.service-attach</key>
+	<true/>
+	<key>com.apple.system-task-ports</key>
+	<true/>
+	<key>com.apple.system-task-ports.control</key>
+	<true/>
+</dict>
+</plist>

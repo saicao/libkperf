@@ -930,7 +930,7 @@ static void profile_func(void) {
     }
 }
 
-int main(int argc, const char * argv[]) {
+int demo1(int argc, const char * argv[]) {
     int ret = 0;
     
     // load dylib
@@ -989,7 +989,6 @@ int main(int argc, const char * argv[]) {
                    ret, kpep_config_error_desc(ret));
             return 1;
         }
-        printf("added event: %s (%s)\n", ev->name, ev->alias);
     }
     
     // prepare buffer and config
@@ -1085,7 +1084,7 @@ int main(int argc, const char * argv[]) {
 static int target_pid = -1;
 
 /// Profile time in seconds.
-static double total_profile_time = 0.1;
+static double total_profile_time = 1;
 
 /// Profile sampler period in seconds (default 10ms).
 static double sample_period = 0.001;
@@ -1100,8 +1099,17 @@ static double get_timestamp(void) {
 #define PERF_KPC        (6)
 #define PERF_KPC_DATA_THREAD   (8)
 
-int main2(int argc, const char * argv[]) {
+int demo2(int argc, const char * argv[]) {
     int ret = 0;
+    if(argc == 2) {
+        int pid = atoi(argv[1]);
+        if(pid!=0){
+            target_pid = pid;
+        } else {
+            printf("Invalid pid: %s\n", argv[1]);
+            return 1;
+        }
+    } 
     
     // load dylib
     if (!lib_init()) {
@@ -1364,7 +1372,7 @@ int main2(int argc, const char * argv[]) {
         u64 counters_1[KPC_MAX_COUNTERS];
     } kpc_thread_data;
     
-    usize thread_capacity = 16;
+    usize thread_capacity = 32;
     usize thread_count = 0;
     kpc_thread_data *thread_data = (kpc_thread_data *)malloc(thread_capacity * sizeof(kpc_thread_data));
     if (!thread_data) {
@@ -1445,7 +1453,7 @@ int main2(int argc, const char * argv[]) {
             counters_one[c] += data->counters_1[c] - data->counters_0[c];
         }
         printf("------------------------\n");
-        printf("thread: %u, trace time: %f\n", data->tid,
+        printf("thread: %x, trace time: %f\n", data->tid,
                kperf_ticks_to_ns(data->timestamp_1 - data->timestamp_0) / 1000000000.0);
         for (usize i = 0; i < ev_count; i++) {
             const event_alias *alias = profile_events + i;
@@ -1459,7 +1467,7 @@ int main2(int argc, const char * argv[]) {
     }
     
     printf("------------------------\n");
-    printf("all threads:\n");
+    printf("all threads: %ld\n", thread_count);
     for (usize i = 0; i < ev_count; i++) {
         const event_alias *alias = profile_events + i;
         u64 val = counters_sum[counter_map[i]];
@@ -1468,4 +1476,8 @@ int main2(int argc, const char * argv[]) {
     
     // TODO: free memory
     return 0;
+}
+int main(int argc, const char * argv[]){
+    // demo1(argc, argv);
+    demo2(argc, argv);
 }
