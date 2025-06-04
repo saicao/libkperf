@@ -1,4 +1,4 @@
-#include "kperf.h"
+#include "kperf/kperf.h"
 #include <dlfcn.h>          // for dlopen() and dlsym()
 #include <stdio.h>
 #include <stdlib.h>
