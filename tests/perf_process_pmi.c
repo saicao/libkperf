@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <pthread.h>
 // -----------------------------------------------------------------------------
 // Demo 2: profile a select process
 // -----------------------------------------------------------------------------
@@ -49,6 +50,14 @@ static kpep_event *get_event(kpep_db *db, const event_alias *alias) {
     return NULL;
 }
 
+
+
+
+
+
+// -----------------------------------------------------------------------------
+// Demo 1: profile a function in current thread
+// -----------------------------------------------------------------------------
 
 /// Target process pid, -1 for all thread.
 static int target_pid = -1;
@@ -145,6 +154,7 @@ int main(int argc, const char * argv[]) {
                ret, kpep_config_error_desc(ret));
         return 1;
     }
+    printf("kpc classes: 0x%x\n", classes);
     if ((ret = kpep_config_kpc_count(cfg, &reg_count))) {
         printf("Failed get kpc count: %d (%s).\n",
                ret, kpep_config_error_desc(ret));
@@ -154,6 +164,9 @@ int main(int argc, const char * argv[]) {
         printf("Failed get kpc map: %d (%s).\n",
                ret, kpep_config_error_desc(ret));
         return 1;
+    }
+    for(usize i = 0; i < KPC_MAX_COUNTERS; i++) {
+        printf("counter_map[%zu] = %zu \n", i, counter_map[i]);
     }
     if ((ret = kpep_config_kpc(cfg, regs, sizeof(regs)))) {
         printf("Failed get kpc registers: %d (%s).\n",
@@ -190,69 +203,100 @@ int main(int argc, const char * argv[]) {
     }
    
     
-    // action id and timer id
+    // // action id and timer id
     u32 actionid = 1;
     u32 timerid = 1;
     
     // alloc action and timer ids
     if ((ret = kperf_action_count_set(KPERF_ACTION_MAX))) {
         printf("Failed set action count: %d.\n", ret);
+        return 1;
     }
     if ((ret = kperf_timer_count_set(KPERF_TIMER_MAX))) {
         printf("Failed set timer count: %d.\n", ret);
+        return 1;
     }
     
     // set what to sample: PMC per thread
     if ((ret = kperf_action_samplers_set(actionid, KPERF_SAMPLER_PMC_THREAD))) {
         printf("Failed set sampler type: %d.\n", ret);
+        return 1;
     }
     // set filter process
     if ((ret = kperf_action_filter_set_by_pid(actionid, target_pid))) {
         printf("Failed set filter pid: %d.\n", ret);
+        return 1;
     }
     
     // setup PET (Profile Every Thread), start sampler
     u64 tick = kperf_ns_to_ticks(sample_period * 1000000000ul);
-    if ((ret = kperf_timer_period_set(actionid, tick))) {
+    if ((ret = kperf_timer_period_set(actionid, 0))) {
         printf("Failed set timer period: %d.\n", ret);
+        return 1;
     }
     if ((ret = kperf_timer_action_set(actionid, timerid))) {
         printf("Failed set timer action: %d.\n", ret);
+        return 1;
     }
     if ((ret = kperf_timer_pet_set(timerid))) {
         printf("Failed set timer PET: %d.\n", ret);
+        return 1;
     }
+    
     if ((ret = kperf_lightweight_pet_set(1))) {
         printf("Failed set lightweight PET: %d.\n", ret);
+        return 1;
     }
     if ((ret = kperf_sample_set(1))) {
         printf("Failed start sample: %d.\n", ret);
+        return 1;
     }
     
     // reset kdebug/ktrace
     if ((ret = kdebug_reset())) {
         printf("Failed reset kdebug: %d.\n", ret);
+        return 1;
     }
     
     int nbufs = 1000000;
     if ((ret = kdebug_trace_setbuf(nbufs))) {
         printf("Failed setbuf: %d.\n", ret);
+        return 1;
     }
     if ((ret = kdebug_reinit())) {
         printf("Failed init kdebug buffer: %d.\n", ret);
+        return 1;
     }
     
     // set trace filter: only log PERF_KPC_DATA_THREAD
-    kd_regtype kdr = { 0 };
-    kdr.type = KDBG_VALCHECK;
-    kdr.value1 = KDBG_EVENTID(DBG_PERF, PERF_KPC, PERF_KPC_DATA_THREAD);
-    if ((ret = kdebug_setreg(&kdr))) {
-        printf("Failed set kdebug filter: %d.\n", ret);
+    // kd_regtype kdr = { 0 };
+    // kdr.type = KDBG_VALCHECK;
+    // kdr.value1 = KDBG_EVENTID(DBG_MACH, DBG_MACH_EXCP_INTR, DBG_INTR_TYPE_PMI);
+    // if ((ret = kdebug_setreg(&kdr))) {
+    //     printf("Failed set kdebug filter: %d.\n", ret);
+    // }
+
+    uint64_t period [10] ={0};
+    
+    period[counter_map[1]]=10000000;
+    ret=kpc_set_period(classes,period);
+    if(ret){
+        printf("Failed to set period: %d.\n", ret);
+        return 1;
+    }
+    ret=kpc_get_period(classes, period);
+    if(ret){
+        printf("Failed to get period: %d.\n", ret);
+        return 1;
+    }
+    for(int i = 0; i < 10; i++) {
+        printf("period[%d]: %llu\n", i, (unsigned long long)period[i]);
     }
     // start trace
     if ((ret = kdebug_trace_enable(1))) {
         printf("Failed enable kdebug trace: %d.\n", ret);
     }
+    
     
     
     
@@ -285,6 +329,7 @@ int main(int argc, const char * argv[]) {
         // read trace buffer from kernel
         usize count = 0;
         kdebug_trace_read(buf_cur, sizeof(kd_buf) * nbufs, &count);
+        printf("read %zu trace entries\n", count);
         for (kd_buf *buf = buf_cur, *end = buf_cur + count; buf < end; buf++) {
             u32 debugid = buf->debugid;
             u32 cls = KDBG_EXTRACT_CLASS(debugid);
@@ -292,9 +337,13 @@ int main(int argc, const char * argv[]) {
             u32 code = KDBG_EXTRACT_CODE(debugid);
             
             // keep only thread PMC data
-            if (cls != DBG_PERF) continue;
-            if (subcls != PERF_KPC) continue;
-            if (code != PERF_KPC_DATA_THREAD) continue;
+            // if (cls != DBG_PERF) {};
+            // if (subcls != PERF_KPC) continue;
+            // if (code != PERF_KPC_DATA_THREAD) continue;
+
+            printf("debugid: 0x%x, cls: %d, subcls: 0x%x, code: 0x%x\n", debugid, cls, subcls, code);
+            // if(subcls != DBG_MACH_EXCP_INTR) continue; 
+            // if(code != DBG_INTR_TYPE_IPI) continue;
             memmove(buf_cur, buf, sizeof(kd_buf));
             buf_cur++;
         }
@@ -303,8 +352,7 @@ int main(int argc, const char * argv[]) {
         double now = get_timestamp();
         if (now - begin > total_profile_time + sample_period) break;
     }
-    
-    
+  
     
     // stop tracing
     kdebug_trace_enable(0);
@@ -316,8 +364,14 @@ int main(int argc, const char * argv[]) {
     kpc_set_counting(0);
     kpc_set_thread_counting(0);
     kpc_force_all_ctrs_set(0);
-    
-    
+    int count=kpc_get_thread_counting();
+    printf("thread counting: %d\n", count);
+    //open file 
+    FILE *fp = fopen("perf_process_pmi.trace", "w");
+    if (!fp) {
+        printf("Failed to open output file.\n");
+        return 1;
+    }
     
     // aggregate thread PMC data
     if (!buf_hdr) {
@@ -344,6 +398,7 @@ int main(int argc, const char * argv[]) {
         printf("Failed to allocate memory for aggregate log.\n");
         return 1;
     }
+    uint64_t last_instr_count=0;
     for (kd_buf *buf = buf_hdr; buf < buf_cur; buf++) {
         u32 func = buf->debugid & KDBG_FUNC_MASK;
         if (func != DBG_FUNC_START) continue;
@@ -374,70 +429,30 @@ int main(int argc, const char * argv[]) {
         }
         if (ci != counter_count) continue; // not enough counters, maybe truncated
         
-        // add to thread data
-        kpc_thread_data *data = NULL;
-        for (usize i = 0; i < thread_count; i++) {
-            if (thread_data[i].tid == tid) {
-                data = thread_data + i;
-                break;
-            }
-        }
-        if (!data) {
-            if (thread_capacity == thread_count) {
-                thread_capacity *= 2;
-                kpc_thread_data *new_data =
-                (kpc_thread_data *)realloc(thread_data, thread_capacity * sizeof(kpc_thread_data));
-                if (!new_data) {
-                    printf("Failed to allocate memory for aggregate log.\n");
-                    return 1;
-                }
-                thread_data = new_data;
-            }
-            data = thread_data + thread_count;
-            thread_count++;
-            memset(data, 0, sizeof(kpc_thread_data));
-            data->tid = tid;
-        }
-        if (data->timestamp_0 == 0) {
-            data->timestamp_0 = buf->timestamp;
-            memcpy(data->counters_0, counters, counter_count * sizeof(u64));
-        } else {
-            data->timestamp_1 = buf->timestamp;
-            memcpy(data->counters_1, counters, counter_count * sizeof(u64));
-        }
-    }
-    
-    
-    u64 counters_sum[KPC_MAX_COUNTERS] = { 0 };
-    for (usize i = 0; i < thread_count; i++) {
-        kpc_thread_data *data = thread_data + i;
-        if (!data->timestamp_0 || !data->timestamp_1) continue;
         
-        u64 counters_one[KPC_MAX_COUNTERS] = { 0 };
-        for (usize c = 0; c < counter_count; c++) {
-            counters_one[c] += data->counters_1[c] - data->counters_0[c];
+        //save into file 
+        // printf("%lld\n",counters[counter_map[1]]-last_instr_count);
+        last_instr_count = counters[counter_map[1]];
+        fprintf(fp, "cpu %d tid: %u, timestamp: %llu, counters: ", buf->cpuid,tid, (unsigned long long)buf->timestamp);
+        // for (u32 i = 0; i < ci; i++) {
+        //     fprintf(fp, "%llu ", (unsigned long long)counters[i]); 
+        // }
+        for(u32 i = 0; i < ev_count; i++) {
+            fprintf(fp, "%s: %llu ", profile_events[i].alias, (unsigned long long)counters[counter_map[i]]);
         }
-        printf("------------------------\n");
-        printf("thread: %x, trace time: %f\n", data->tid,
-               kperf_ticks_to_ns(data->timestamp_1 - data->timestamp_0) / 1000000000.0);
-        for (usize i = 0; i < ev_count; i++) {
-            const event_alias *alias = profile_events + i;
-            u64 val = counters_one[counter_map[i]];
-            printf("%14s: %llu\n", alias->alias, val);
-        }
-        
-        for (usize c = 0; c < counter_count; c++) {
-            counters_sum[c] += counters_one[c];
-        }
+        fprintf(fp, "\n");
+
+        // printf("all threads: %ld\n", thread_count);
+        // for (usize i = 0; i < ev_count; i++) {
+        //     const event_alias *alias = profile_events + i;
+        //     u64 val = counters_sum[counter_map[i]];
+        //     printf("%14s: %llu\n", alias->alias, val);
+        // }
+
     }
+    fclose(fp);
     
-    printf("------------------------\n");
-    printf("all threads: %ld\n", thread_count);
-    for (usize i = 0; i < ev_count; i++) {
-        const event_alias *alias = profile_events + i;
-        u64 val = counters_sum[counter_map[i]];
-        printf("%14s: %llu\n", alias->alias, val);
-    }
+    
     
     // TODO: free memory
     return 0;

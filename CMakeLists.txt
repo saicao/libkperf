@@ -4,7 +4,7 @@ project(libkperf
     VERSION 0.1
     LANGUAGES C
 )
-set(LIBKPERF_TESTS ON CACHE BOOL "Enable tests for libkperf")
+set(LIBKPERF_TESTS OFF CACHE BOOL "Enable tests for libkperf")
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 add_library(libkperf

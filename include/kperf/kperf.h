@@ -528,8 +528,10 @@ int kpep_event_alias(kpep_event *ev, const char **alias_ptr);
 /// Get event's description.
 /// @return kpep_config_error_code, 0 for success.
 int kpep_event_description(kpep_event *ev, const char **str_ptr);
-
-
+/// Get PMI (Performance Monitoring Interrupt) period
+int kpc_get_period(u32 classes, u64 *period);
+/// Set PMI period.
+int kpc_set_period(u32 classes, u64 *period);
 
 // -----------------------------------------------------------------------------
 // kdebug private structs

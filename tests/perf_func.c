@@ -142,6 +142,12 @@ int main(int argc, const char * argv[]) {
                ret, kpep_config_error_desc(ret));
         return 1;
     }
+    // for(int i=0;i<KPC_MAX_COUNTERS;i++) {
+    //     printf("regs[%d] = %llx \n", i, regs[i]);
+    // }
+    // for(int i=0;i<KPC_MAX_COUNTERS;i++) {
+    //     printf("counter_map[%d] = %zu \n", i, counter_map[i]);
+    // }
     
     // set config to kernel
     if ((ret = kpc_force_all_ctrs_set(1))) {

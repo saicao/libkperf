@@ -61,7 +61,8 @@ static int (*kpep_db_event_internal)(kpep_db *db, const char *name, kpep_event *
 static int (*kpep_event_name_internal)(kpep_event *ev, const char **name_ptr);
 static int (*kpep_event_alias_internal)(kpep_event *ev, const char **alias_ptr);
 static int (*kpep_event_description_internal)(kpep_event *ev, const char **str_ptr);
-
+static int (*kpc_get_period_internal)(u32 classes, u64 *period);
+static int (*kpc_set_period_internal)(u32 classes, u64 *period);
 int kperf_lightweight_pet_get(u32 *enabled) {
     if (!enabled) return -1;
     usize size = 4;
@@ -115,6 +116,8 @@ static const lib_symbol lib_symbols_kperf[] = {
     lib_symbol_def(kperf_ns_to_ticks),
     lib_symbol_def(kperf_ticks_to_ns),
     lib_symbol_def(kperf_tick_frequency),
+    lib_symbol_def(kpc_get_period),
+    lib_symbol_def(kpc_set_period),
 };
 
 static const lib_symbol lib_symbols_kperfdata[] = {
@@ -141,6 +144,7 @@ static const lib_symbol lib_symbols_kperfdata[] = {
     lib_symbol_def(kpep_event_name),
     lib_symbol_def(kpep_event_alias),
     lib_symbol_def(kpep_event_description),
+
 };
 
 #define lib_path_kperf "/System/Library/PrivateFrameworks/kperf.framework/kperf"
@@ -320,6 +324,12 @@ int kpep_event_alias (kpep_event *ev, const char **alias_ptr){
 }
 int kpep_event_description (kpep_event *ev, const char **str_ptr){
     return kpep_event_description_internal(ev, str_ptr);
+}
+int kpc_get_period (u32 classes, u64 *period) {
+    return kpc_get_period_internal(classes, period);
+}
+int kpc_set_period (u32 classes, u64 *period) {
+    return kpc_set_period_internal(classes, period);
 }
 static bool lib_inited = false;
 static bool lib_has_err = false;
